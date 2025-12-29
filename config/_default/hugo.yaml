@@ -24,22 +24,24 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      # Hugo Modules often need Go
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.22"
 
-      # TailwindCSS CLI required by HugoBlox (Tailwind pipeline)
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Install TailwindCSS CLI
-        run: npm install -g tailwindcss
+      # IMPORTANT: Tailwind CLI (v4+) lives in @tailwindcss/cli
+      - name: Install Tailwind CLI
+        run: |
+          npm i -g tailwindcss @tailwindcss/cli
+          echo "$(npm config get prefix)/bin" >> $GITHUB_PATH
+          which tailwindcss
+          tailwindcss --help
 
-      # Gives us the correct base URL for Pages
       - name: Configure Pages
         id: pages
         uses: actions/configure-pages@v5
@@ -71,3 +73,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
