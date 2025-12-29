@@ -1,55 +1,73 @@
-# Configuration of Hugo
-# Guide: https://docs.hugoblox.com/tutorial/
-# Hugo Documentation: https://gohugo.io/getting-started/configuration/#all-configuration-settings
-# This file is formatted using YAML syntax - learn more at https://learnxinyminutes.com/docs/yaml/
+name: Deploy Hugo site to GitHub Pages
 
-# Website name (set in params.yaml under hugoblox.branding.name)
-title: ''
-# Website URL
-baseURL: "https://mean-tennis-opinions.github.io/"
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
 
-############################
-## LANGUAGE
-############################
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
-defaultContentLanguage: en
-hasCJKLanguage: false
-defaultContentLanguageInSubdir: false
-removePathAccents: true
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
-############################
-## ADVANCED
-############################
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
 
-build:
-  writeStats: true
-enableGitInfo: false
-summaryLength: 30
-pagination:
-  pagerSize: 10
-enableEmoji: true
-enableRobotsTXT: true
-footnotereturnlinkcontents: <sup>^</sup>
-ignoreFiles: [".ipynb_checkpoints$", "\\.Rmd$", "\\.Rmarkdown$", "_cache$"]
-disableAliases: true
-outputs:
-  home: [HTML, RSS, headers, redirects, backlinks]
-  section: [HTML, RSS]
-imaging:
-  resampleFilter: lanczos
-  quality: 90
-  anchor: smart
-  hint: picture
-timeout: 600000
-taxonomies:
-  author: authors
-  tag: tags
-  publication_type: publication_types
-markup:
-  _merge: deep
-  highlight:
-    lineNos: false
-security:
-  _merge: deep
-sitemap:
-  _merge: deep
+      # Hugo Modules often need Go
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      # TailwindCSS CLI required by HugoBlox (Tailwind pipeline)
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install TailwindCSS CLI
+        run: npm install -g tailwindcss
+
+      # Gives us the correct base URL for Pages
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: "0.153.4"
+          extended: true
+
+      - name: Build
+        env:
+          HUGO_ENVIRONMENT: production
+          HUGO_CACHEDIR: /tmp/hugo_cache_runner
+        run: hugo --minify --baseURL "${{ steps.pages.outputs.base_url }}/"
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
